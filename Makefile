@@ -6,7 +6,7 @@ build:
 
 cross-build:
 	@docker buildx create --name mybuilder --use
-	@docker buildx build --platform ${BUILDX_PLATFORMS} --tag ${DOCKER_IMAGE_NAME} .
+	@docker buildx build --platform ${BUILDX_PLATFORMS} --tag ${DOCKER_IMAGE_NAME} --progress plain .
 
 # push:
 # 	docker push $(DOCKER_IMAGE_NAME)

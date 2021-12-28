@@ -8,18 +8,18 @@ jobs:
       BUILDX_PLATFORMS: linux/amd64,linux/arm64
     steps:
       - checkout
-      - run:
-          name: Build from dockerfile
-          command: |
-            make build
-      - run:
-          name: Test Docker image
-          command: |
-            make test
-      - run:
-          name: Log in to docker hub
-          command: |
-            docker login -u $DOCKER_USER -p $DOCKER_PASS
+      # - run:
+      #     name: Build from dockerfile
+      #     command: |
+      #       make build
+      # - run:
+      #     name: Test Docker image
+      #     command: |
+      #       make test
+      # - run:
+      #     name: Log in to docker hub
+      #     command: |
+      #       docker login -u $DOCKER_USER -p $DOCKER_PASS
       # - run:
       #     name: Push to docker hub
       #     command: |
@@ -44,3 +44,7 @@ jobs:
           name: Tag golden
           command: |
             BUILDX_PLATFORMS="$BUILDX_PLATFORMS" make cross-build
+      - run:
+          name: show docker images
+          command: |
+            docker images
