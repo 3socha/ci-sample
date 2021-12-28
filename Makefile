@@ -4,7 +4,7 @@ all: build
 build:
 	DOCKER_BUILDKIT=1 docker image build --tag $(DOCKER_IMAGE_NAME) --progress plain .
 
-cross-build-push:
+cross-build-and-push:
 	@docker buildx create --name mybuilder --use
 	@docker buildx build --platform ${BUILDX_PLATFORMS} --tag ${DOCKER_IMAGE_NAME} --progress plain --push .
 

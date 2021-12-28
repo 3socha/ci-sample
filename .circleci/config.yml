@@ -48,5 +48,5 @@ jobs:
           name: Cross-build and push
           command: |
             if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              BUILDX_PLATFORMS="$BUILDX_PLATFORMS" make cross-build
+              BUILDX_PLATFORMS="$BUILDX_PLATFORMS" make cross-build-and-push
             fi
