@@ -1,4 +1,9 @@
+# syntax = docker/dockerfile:1.3-labs
 FROM ubuntu:20.04
 
-RUN apt update
-RUN apt install -y curl
+RUN <<EOL
+  apt update
+  apt install -y curl bats
+  apt cache clean
+  rm -rf /var/lib/apt/lists/*
+EOL
