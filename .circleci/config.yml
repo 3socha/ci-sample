@@ -8,43 +8,45 @@ jobs:
       BUILDX_PLATFORMS: linux/amd64,linux/arm64
     steps:
       - checkout
-      # - run:
-      #     name: Build from dockerfile
-      #     command: |
-      #       make build
-      # - run:
-      #     name: Test Docker image
-      #     command: |
-      #       make test
-      # - run:
-      #     name: Log in to docker hub
-      #     command: |
-      #       docker login -u $DOCKER_USER -p $DOCKER_PASS
-      # - run:
-      #     name: Push to docker hub
-      #     command: |
-      #       make push
-      - run:
+      - run:  # pull-req only
+          name: Build Docker image
+          command: |
+            if [ "${CIRCLE_BRANCH}" != "main" ]; then
+              make build
+            fi
+      - run:  # pull-req only
+          name: Test Docker image
+          command: |
+            if [ "${CIRCLE_BRANCH}" != "main" ]; then
+              make test
+            fi
+      - run:  # main branch only
+          name: Log in to Docker Hub
+          command: |
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+            fi
+      - run:  # main branch only
           name: Install buildx
           command: |
-            BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64"
-            curl --output docker-buildx \
-              --silent --show-error --location --fail --retry 3 \
-              "$BUILDX_BINARY_URL"
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64"
+              curl --output docker-buildx \
+                --silent --show-error --location --fail --retry 3 \
+                "$BUILDX_BINARY_URL"
 
-            mkdir -p ~/.docker/cli-plugins
+              mkdir -p ~/.docker/cli-plugins
 
-            mv docker-buildx ~/.docker/cli-plugins/
-            chmod a+x ~/.docker/cli-plugins/docker-buildx
+              mv docker-buildx ~/.docker/cli-plugins/
+              chmod a+x ~/.docker/cli-plugins/docker-buildx
 
-            docker buildx install
-            # Run binfmt
-            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
-      - run:
-          name: Tag golden
+              docker buildx install
+              # Run binfmt
+              docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+            fi
+      - run:  # main branch only
+          name: Cross-build and push
           command: |
-            BUILDX_PLATFORMS="$BUILDX_PLATFORMS" make cross-build
-      - run:
-          name: show docker images
-          command: |
-            docker images
+            if [ "${CIRCLE_BRANCH}" = "main" ]; then
+              BUILDX_PLATFORMS="$BUILDX_PLATFORMS" make cross-build
+            fi
