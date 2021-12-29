@@ -1,5 +1,5 @@
 # syntax = docker/dockerfile:1.3-labs
-FROM ubuntu:20.04
+FROM ubuntu:21.10
 
 RUN <<EOL
   apt update

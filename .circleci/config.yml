@@ -29,7 +29,7 @@ jobs:
               --tag 3socha/ci-sample \
               --progress plain .
       - run:
-          name: Load x64 image
+          name: Load x64 image (use cache)
           command: |
             docker buildx build \
               --platform linux/amd64 \
@@ -44,6 +44,7 @@ jobs:
       - run:
           name: Test x64 image
           command: |
+            mkdir ~/reports
             docker create -v /root/src --name source ubuntu:21.10 /bin/true
             docker cp test.bats source:/root/src
             docker container run \
@@ -63,7 +64,7 @@ jobs:
           command: |
             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
       - run:
-          name: Push Docker images
+          name: Push Docker images (use cache)
           command: |
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
