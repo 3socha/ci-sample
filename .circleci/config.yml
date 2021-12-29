@@ -50,7 +50,6 @@ jobs:
     environment:
       DOCKER_BUILDKIT: "1"
       BUILDX_PLATFORMS: linux/amd64,linux/arm64
-      # BUILDX_BINARY_URL: https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64
     steps:
       - checkout
       - run:
@@ -60,7 +59,7 @@ jobs:
       - run:
           name: Install Buildx
           command: |
-            curl -sfSL --retry 3 "$BUILDX_BINARY_URL" -o docker-buildx 
+            curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o docker-buildx 
             mkdir -p ~/.docker/cli-plugins
             mv docker-buildx ~/.docker/cli-plugins/
             chmod a+x ~/.docker/cli-plugins/docker-buildx
@@ -79,7 +78,7 @@ workflows:
   scheduled-workflow:
     triggers:
       - schedule:
-          cron: "20 8 * * *"
+          cron: "30 8 * * *"
           filters:
             branches:
               only:
