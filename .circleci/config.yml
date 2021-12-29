@@ -1,52 +1,88 @@
 version: 2.1
-jobs:
-  build:
+executors:
+  ubuntu-2004:
     machine:  # docker executor ではなく machine executor を使用する; https://circleci.com/ja/blog/building-docker-images-for-multiple-os-architectures/ - CI パイプラインを設定する
       image: ubuntu-2004:202111-01  # https://circleci.com/docs/2.0/configuration-reference/#available-machine-images
+
+jobs:
+  build-test-push:
+    executor: ubuntu-2004
     environment:
-      DOCKER_BUILDKIT: 1
-      BUILDX_PLATFORMS: linux/amd64,linux/arm64
+      DOCKER_BUILDKIT: "1"
     steps:
       - checkout
-      - run:  # pull-req only
-          name: Build Docker image
+      - run:
+          name: Install test tools
           command: |
-            if [ "${CIRCLE_BRANCH}" != "main" ]; then
-              make build
-            fi
-      - run:  # pull-req only
-          name: Test Docker image
+            sudo apt update -qq
+            sudo apt install -y -qq moreutils
+            npm install --silent --no-progress tap-xunit
+      - run:
+          name: Build the Docker image
           command: |
-            if [ "${CIRCLE_BRANCH}" != "main" ]; then
-              make test
-            fi
-      - run:  # main branch only
+            make build-ci
+      - run:
+          name: Test the Docker image
+          command: |
+            mkdir ~/reports
+            make test-ci | pee cat "npm exec -- tap-xunit > ~/reports/result.xml"
+      - store_test_results:  # 以前のテストステップが失敗しても実行される
+          path: ~/reports
+      - run: |  # main ブランチがターゲットでない場合はジョブを停止する
+          if [ "$CIRCLE_BRANCH" != "main" ]; then
+            circleci-agent step halt
+          fi
+      - run:
+          name: Login to Docker Hub
+          command: |
+            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+      - run:
+          name: Push the Docker image
+          command: |
+            make push
+
+  cross-build-push:  # buildx でのクロスビルド時に load ができず push するため、ここではテストを実行しない
+    # filters:  # main ブランチのみ
+    #   branches:
+    #     only:
+    #       - main
+    executor: ubuntu-2004
+    environment:
+      DOCKER_BUILDKIT: "1"
+      BUILDX_PLATFORMS: linux/amd64,linux/arm64
+      # BUILDX_BINARY_URL: https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64
+    steps:
+      - checkout
+      - run:
           name: Log in to Docker Hub
           command: |
-            if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
-            fi
-      - run:  # main branch only
-          name: Install buildx
-          command: |
-            if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              BUILDX_BINARY_URL="https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64"
-              curl --output docker-buildx \
-                --silent --show-error --location --fail --retry 3 \
-                "$BUILDX_BINARY_URL"
-
-              mkdir -p ~/.docker/cli-plugins
-
-              mv docker-buildx ~/.docker/cli-plugins/
-              chmod a+x ~/.docker/cli-plugins/docker-buildx
-
-              docker buildx install
-              # Run binfmt
-              docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
-            fi
-      - run:  # main branch only
+            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+      # - run:
+      #     name: Install Buildx
+      #     command: |
+      #       curl -sfSL --retry 3 "$BUILDX_BINARY_URL" -o docker-buildx 
+      #       mkdir -p ~/.docker/cli-plugins
+      #       mv docker-buildx ~/.docker/cli-plugins/
+      #       chmod a+x ~/.docker/cli-plugins/docker-buildx
+      #       docker buildx install
+      #       docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+      - run:
           name: Cross-build and push
           command: |
-            if [ "${CIRCLE_BRANCH}" = "main" ]; then
-              BUILDX_PLATFORMS="$BUILDX_PLATFORMS" make cross-build-and-push
-            fi
+            make cross-build-and-push
+
+workflows:
+  version: 2.1
+  commit-workflow:
+    jobs:
+      - build-test-push
+  scheduled-workflow:
+    triggers:
+      - schedule:
+          cron: "0,30 * * * *"  # 30 分ごと
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - cross-build-push
