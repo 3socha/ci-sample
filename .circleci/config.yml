@@ -2,22 +2,21 @@ version: 2.1
 jobs:
   build:
     docker:
-      # - image: docker:stable  # alpine based image
-      - image: docker/buildx-bin:0.7.1  
+      - image: docker:stable  # alpine based image (buildx インストール済みのイメージを使った方が良さそう)
         environment:
           DOCKER_BUILDKIT: "1"
     steps:
       - checkout
       - setup_remote_docker:
           version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
-      # - run:
-      #     name: Install Buildx  # https://docs.docker.com/buildx/working-with-buildx/
-      #     command: |
-      #       apk add --no-progress make curl
-      #       mkdir -p ~/.docker/cli-plugins/
-      #       curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
-      #       chmod a+x ~/.docker/cli-plugins/docker-buildx
-      #       docker buildx install
+      - run:
+          name: Install Buildx  # https://docs.docker.com/buildx/working-with-buildx/
+          command: |
+            apk add --no-progress make curl
+            mkdir -p ~/.docker/cli-plugins/
+            curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
       - run:
           name: Test Buildx
           command: |
@@ -109,11 +108,11 @@ jobs:
 #           command: |
 #             make cross-build-and-push
 
-# workflows:
-#   version: 2.1
-#   commit-workflow:
-#     jobs:
-#       - build-test-push
+workflows:
+  version: 2.1
+  commit-workflow:
+    jobs:
+      - build
 #   scheduled-workflow:
 #     triggers:
 #       - schedule:
