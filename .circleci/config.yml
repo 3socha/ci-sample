@@ -57,15 +57,15 @@ jobs:
           name: Log in to Docker Hub
           command: |
             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
-      # - run:
-      #     name: Install Buildx
-      #     command: |
-      #       curl -sfSL --retry 3 "$BUILDX_BINARY_URL" -o docker-buildx 
-      #       mkdir -p ~/.docker/cli-plugins
-      #       mv docker-buildx ~/.docker/cli-plugins/
-      #       chmod a+x ~/.docker/cli-plugins/docker-buildx
-      #       docker buildx install
-      #       docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
+      - run:
+          name: Install Buildx
+          command: |
+            curl -sfSL --retry 3 "$BUILDX_BINARY_URL" -o docker-buildx 
+            mkdir -p ~/.docker/cli-plugins
+            mv docker-buildx ~/.docker/cli-plugins/
+            chmod a+x ~/.docker/cli-plugins/docker-buildx
+            docker buildx install
+            docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
       - run:
           name: Cross-build and push
           command: |
@@ -79,7 +79,7 @@ workflows:
   scheduled-workflow:
     triggers:
       - schedule:
-          cron: "0,30 * * * *"  # 30 分ごと
+          cron: "20 8 * * *"
           filters:
             branches:
               only:
