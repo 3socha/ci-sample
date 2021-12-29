@@ -45,10 +45,10 @@ jobs:
             make push
 
   cross-build-push:  # buildx でのクロスビルド時に load ができず push するため、ここではテストを実行しない
-    filters:  # main ブランチのみ
-      branches:
-        only:
-          - main
+    # filters:  # main ブランチのみ
+    #   branches:
+    #     only:
+    #       - main
     executor: ubuntu-2004
     environment:
       DOCKER_BUILDKIT: "1"
