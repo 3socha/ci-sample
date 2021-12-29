@@ -16,7 +16,7 @@ jobs:
             chmod a+x ~/.docker/cli-plugins/docker-buildx
             docker buildx install
             docker buildx version
-            # docker buildx create --name multi-arch-builder --use
+            docker buildx create --name multi-arch-builder --use
       - setup_remote_docker:
           version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
       - run:
