@@ -22,18 +22,56 @@ jobs:
             docker context create buildcontext
             docker buildx create buildcontext --use
       - run:
-          name: Cross-build
+          name: Build Docker images
           command: |
-            docker buildx ls
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
-              --tag 3socha/ci-sample .
-          # make cross-build
+              --tag 3socha/ci-sample \
+              --progress plain .
+      - run:
+          name: Load x64 image
+          command: |
+            docker buildx build \
+              --platform linux/amd64 \
+              --tag 3socha/ci-sample \
+              --progress plain \
+              --load .
+      - run:
+          name: Install test tools
+          command: |
+            apk add --no-progress npm moreutils
+            npm install --global --silent --no-progress tap-xunit
+      - run:
+          name: Test x64 image
+            docker create -v /root/src --name source ubuntu:21.10 /bin/true
+            docker cp test.bats source:/root/src
+            docker container run \
+              --rm \
+              --net=none \
+              --volumes-from source \
+              3socha/ci-sample \
+              /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/result.xml"
+      - store_test_results:  # 以前のテストステップが失敗しても実行される
+          path: ~/reports
+      # - run: |  # main ブランチがターゲットでない場合はジョブを停止する
+      #     if [ "$CIRCLE_BRANCH" != "main" ]; then
+      #       circleci-agent step halt
+      #     fi
+      - run:
+          name: Login to Docker Hub
+          command: |
+            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+      - run:
+          name: Push Docker images
+          command: |
+            docker buildx build \
+              --platform linux/amd64,linux/arm64 \
+              --tag 3socha/ci-sample \
+              --progress plain \
+              --push .
 
       #     # https://www.docker.com/blog/multi-arch-build-what-about-circleci/
       #     # docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
-
-
 
 # version: 2.1
 # executors:
