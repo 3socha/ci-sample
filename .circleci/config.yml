@@ -20,10 +20,10 @@ jobs:
           name: Install test tools
           # machine executor では apt が使えない模様; https://discuss.circleci.com/t/machine-executor-still-running-apt-when-commands-execute/29200
           command: |
-            # apt update
-            # apt install -y moreutils npm
-            curl -LO http://ftp.us.debian.org/debian/pool/main/m/moreutils/moreutils_0.66-1_amd64.deb
-            dpkg --install moreutils_0.66-1_amd64.deb
+            sudo apt update
+            sudo apt install -y moreutils
+            # curl -LO http://ftp.us.debian.org/debian/pool/main/m/moreutils/moreutils_0.66-1_amd64.deb
+            # sudo dpkg --install moreutils_0.66-1_amd64.deb
             curl -L https://nodejs.org/dist/$NODE_VERSION/node-$NODE_VERSION-linux-x64.tar.gz | tar xf -
             node-*-linux-x64/bin/npm install --global --silent --no-progress tap-xunit
       - run:
