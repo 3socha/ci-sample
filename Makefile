@@ -1,5 +1,5 @@
 DOCKER_IMAGE_NAME := 3socha/ci-sample
-DOCKER_TAG_NAME := $(shell date +%Y%m%d-%H%)
+DOCKER_TAG_NAME := $(shell date +%Y%m%d-%H%M%S)
 
 all: build
 
