@@ -79,4 +79,13 @@ workflows:
   commit-workflow:
     jobs:
       - build-test-push
-      - cross-build-push  # スケジュールにする
+  scheduled-workflow:
+    triggers:
+      - schedule:
+          cron: "30 * * * *" # 毎時 30 分
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - cross-build-push
