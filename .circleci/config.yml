@@ -11,14 +11,14 @@ jobs:
           version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version; Buildx は Docker 20.10 で正式サポート
       - run:
           name: Install Docker Buildx  # https://docs.docker.com/buildx/working-with-buildx/
+          # binfmt: https://matsuand.github.io/docs.docker.jp.onthefly/buildx/working-with-buildx/#build-multi-platform-images
           command: |
             apk add --no-progress make curl
             mkdir -p ~/.docker/cli-plugins/
             curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
             chmod a+x ~/.docker/cli-plugins/docker-buildx
             docker buildx version
-            # https://matsuand.github.io/docs.docker.jp.onthefly/buildx/working-with-buildx/#build-multi-platform-images
-            # docker run --privileged --rm tonistiigi/binfmt --install arm64
+            docker run --privileged --rm tonistiigi/binfmt --install arm64
             docker context create buildcontext
             docker buildx create buildcontext --use
       - run:
