@@ -43,6 +43,7 @@ jobs:
             npm install --global --silent --no-progress tap-xunit
       - run:
           name: Test x64 image
+          command: |
             docker create -v /root/src --name source ubuntu:21.10 /bin/true
             docker cp test.bats source:/root/src
             docker container run \
