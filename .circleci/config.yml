@@ -7,8 +7,6 @@ jobs:
           DOCKER_BUILDKIT: "1"
     steps:
       - checkout
-      - setup_remote_docker:
-          version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
       - run:
           name: Install Buildx  # https://docs.docker.com/buildx/working-with-buildx/
           command: |
@@ -17,11 +15,10 @@ jobs:
             curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
             chmod a+x ~/.docker/cli-plugins/docker-buildx
             docker buildx install
-      - run:
-          name: Test Buildx
-          command: |
             docker buildx version
             # docker buildx create --name multi-arch-builder --use
+      - setup_remote_docker:
+          version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
       - run:
           name: Cross-build
           command: |
