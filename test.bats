@@ -5,5 +5,5 @@
 
 @test "echo" {
   run echo unko
-  [ "${output}" = "hoge" ]
+  [ "${output}" = "unko" ]
 }
