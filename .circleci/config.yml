@@ -5,14 +5,13 @@ jobs:
       - image: cimg/base:2021.12-20.04  # CircleCI Convenience Images: https://circleci.com/docs/2.0/next-gen-migration-guide/; https://hub.docker.com/r/cimg/base
         environment:
           DOCKER_BUILDKIT: "1"
-          DEBIAN_FRONTEND: noninteractive
+          DOCKER_IMAGE_NAME: 3socha/ci-sample
     steps:
       - checkout
       - setup_remote_docker:
           version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version; Buildx は Docker 20.10 で正式サポート
       - run:
           name: Install Docker Buildx  # https://docs.docker.com/buildx/working-with-buildx/
-          # binfmt: https://matsuand.github.io/docs.docker.jp.onthefly/buildx/working-with-buildx/#build-multi-platform-images
           command: |
             mkdir -p ~/.docker/cli-plugins/
             curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
@@ -24,18 +23,12 @@ jobs:
       - run:
           name: Build Docker images
           command: |
-            docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              --tag 3socha/ci-sample \
-              --progress plain .
+            docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME --progress plain .
       - run:
-          name: Load x64 image (use cache)
+          name: Load Docker images (use cache)
           command: |
-            docker buildx build \
-              --platform linux/amd64 \
-              --tag 3socha/ci-sample \
-              --progress plain \
-              --load .
+            docker buildx build --platform linux/amd64 --tag $DOCKER_IMAGE_NAME:amd64 --progress plain --load .
+            docker buildx build --platform linux/arm64 --tag $DOCKER_IMAGE_NAME:arm64 --progress plain --load .
       - run:
           name: Install test tools
           command: |
@@ -47,23 +40,21 @@ jobs:
             PATH=$PATH:~/opt/bin npm install --global --silent --no-progress tap-xunit
             echo "export PATH=$PATH:~/opt/bin" >> $BASH_ENV
       - run:
-          name: Test x64 image
+          name: Test Docker images
           command: |
             mkdir ~/reports
-            docker create -v /root/src --name source ubuntu:21.10 /bin/true
+            docker create -v /root/src --name source ubuntu:20.04 /bin/true
             docker cp test.bats source:/root/src
-            docker container run \
-              --rm \
-              --net=none \
-              --volumes-from source \
-              3socha/ci-sample \
-              /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/result.xml"
+            docker container run --rm --net=none --volumes-from source $DOCKER_IMAGE_NAME:amd64 \
+              /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/amd64.xml"
+            docker container run --rm --net=none --volumes-from source $DOCKER_IMAGE_NAME:arm64 \
+              /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/arm64.xml"
       - store_test_results:  # 以前のテストステップが失敗しても実行される
           path: ~/reports
-      # - run: |  # main ブランチがターゲットでない場合はジョブを停止する
-      #     if [ "$CIRCLE_BRANCH" != "main" ]; then
-      #       circleci-agent step halt
-      #     fi
+      - run: |  # main ブランチがターゲットでない場合はジョブを停止する
+          if [ "$CIRCLE_BRANCH" != "main" ]; then
+            circleci-agent step halt
+          fi
       - run:
           name: Login to Docker Hub
           command: |
@@ -71,99 +62,21 @@ jobs:
       - run:
           name: Push Docker images (use cache)
           command: |
-            docker buildx build \
-              --platform linux/amd64,linux/arm64 \
-              --tag 3socha/ci-sample \
-              --progress plain \
-              --push .
-
-      #     # https://www.docker.com/blog/multi-arch-build-what-about-circleci/
-      #     # docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
-
-# version: 2.1
-# executors:
-#   ubuntu-2004:
-#     machine:  # docker executor ではなく machine executor を使用する; https://circleci.com/ja/blog/building-docker-images-for-multiple-os-architectures/ - CI パイプラインを設定する
-#       image: ubuntu-2004:202111-01  # https://circleci.com/docs/2.0/configuration-reference/#available-machine-images
-
-# jobs:
-#   build-test-push:
-#     executor: ubuntu-2004
-#     environment:
-#       DOCKER_BUILDKIT: "1"
-#     steps:
-#       - checkout
-#       - run:
-#           name: Install test tools
-#           command: |
-#             sudo apt update -qq
-#             sudo apt install -y -qq moreutils
-#             npm install --silent --no-progress tap-xunit
-#       - run:
-#           name: Build the Docker image
-#           command: |
-#             make build-ci
-#       - run:
-#           name: Test the Docker image
-#           command: |
-#             mkdir ~/reports
-#             make test-ci | pee cat "npm exec -- tap-xunit > ~/reports/result.xml"
-#       - store_test_results:  # 以前のテストステップが失敗しても実行される
-#           path: ~/reports
-#       - run: |  # main ブランチがターゲットでない場合はジョブを停止する
-#           if [ "$CIRCLE_BRANCH" != "main" ]; then
-#             circleci-agent step halt
-#           fi
-#       - run:
-#           name: Login to Docker Hub
-#           command: |
-#             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
-#       - run:
-#           name: Push the Docker image
-#           command: |
-#             make push
-
-#   cross-build-push:  # buildx でのクロスビルド時に load ができず push するため、ここではテストを実行しない
-#     # filters:  # main ブランチのみ
-#     #   branches:
-#     #     only:
-#     #       - main
-#     executor: ubuntu-2004
-#     environment:
-#       DOCKER_BUILDKIT: "1"
-#       BUILDX_PLATFORMS: linux/amd64,linux/arm64
-#     steps:
-#       - checkout
-#       - run:
-#           name: Log in to Docker Hub
-#           command: |
-#             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
-#       - run:
-#           name: Install Buildx
-#           command: |
-#             curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o docker-buildx 
-#             mkdir -p ~/.docker/cli-plugins
-#             mv docker-buildx ~/.docker/cli-plugins/
-#             chmod a+x ~/.docker/cli-plugins/docker-buildx
-#             docker buildx install
-#             docker run --rm --privileged tonistiigi/binfmt:latest --install "$BUILDX_PLATFORMS"
-#       - run:
-#           name: Cross-build and push
-#           command: |
-#             make cross-build-and-push
+            docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME:$(date +%Y%m%d) --progress plain --push .
+            docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME:latest          --progress plain --push .
 
 workflows:
   version: 2.1
   commit-workflow:
     jobs:
       - build
-#   scheduled-workflow:
-#     triggers:
-#       - schedule:
-#           cron: "30 8 * * *"
-#           filters:
-#             branches:
-#               only:
-#                 - main
-#     jobs:
-#       - cross-build-push
+  scheduled-workflow:
+    triggers:
+      - schedule:
+          cron: "15 2 * * *"
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - build
