@@ -2,11 +2,13 @@ version: 2.1
 jobs:
   build:
     docker:
-      - image: docker:stable  # alpine based image (buildx インストール済みのイメージを使った方が良さそう)
+      - image: docker:20.10.12  # alpine based image (buildx インストール済みのイメージを使った方が良さそう)
         environment:
           DOCKER_BUILDKIT: "1"
     steps:
       - checkout
+      - setup_remote_docker:
+          version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version; Buildx は Docker 20.10 で正式サポート
       - run:
           name: Install Buildx  # https://docs.docker.com/buildx/working-with-buildx/
           command: |
@@ -17,15 +19,13 @@ jobs:
             docker buildx install
             docker buildx version
             docker buildx create --name multi-arch-builder --use
-      - setup_remote_docker:
-          version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
       - run:
           name: Cross-build
           command: |
+            docker buildx ls
             docker buildx build \
               --platform linux/amd64,linux/arm64 \
               --tag 3socha/ci-sample .
-
           # make cross-build
 
       #     # https://www.docker.com/blog/multi-arch-build-what-about-circleci/

@@ -1,5 +1,6 @@
 DOCKER_IMAGE_NAME := 3socha/ci-sample
 DOCKER_TAG_NAME := $(shell date +%Y%m%d-%H%M%S)
+BUILDX_PLATFORMS := linux/amd64,linux/arm64
 
 all: build
 
@@ -14,8 +15,13 @@ push:
 	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_TAG_NAME)
 	docker push $(DOCKER_IMAGE_NAME):latest
 
+cross-build-ci:
+	docker buildx build --platform ${BUILDX_PLATFORMS} --tag ${DOCKER_IMAGE_NAME}:latest --progress plain .
+
+# docker buildx build --platform ${BUILDX_PLATFORMS} --tag ${DOCKER_IMAGE_NAME}:$(DOCKER_TAG_NAME) --progress plain.
+# docker buildx create --name multi-arch-builder --use
+
 cross-build-and-push:
-	docker buildx create --name multi-arch-builder --use
 	docker buildx build --platform ${BUILDX_PLATFORMS} --tag ${DOCKER_IMAGE_NAME}:latest --progress plain --push .
 	docker buildx build --platform ${BUILDX_PLATFORMS} --tag ${DOCKER_IMAGE_NAME}:$(DOCKER_TAG_NAME) --progress plain --push .
 
