@@ -87,10 +87,6 @@ jobs:
     environment:
       DOCKER_IMAGE_NAME: 3socha/ci-sample
     steps:
-      # - run: |
-      #     if [ "$CIRCLE_BRANCH" != "main" ]; then
-      #       circleci-agent step halt
-      #     fi
       - run:
           name: Login to Docker Hub
           command: |
@@ -113,8 +109,7 @@ workflows:
       - push-manifest:
           filters:
             branches:
-              only:
-                - main
+              only: main
           requires:
             - build-x64
             - build-arm64
