@@ -142,6 +142,10 @@ jobs:
     environment:
       DOCKER_IMAGE_NAME: 3socha/ci-sample
     steps:
+      - run: |
+          if [ "$CIRCLE_BRANCH" != "main" ]; then
+            circleci-agent step halt
+          fi
       # - setup_remote_docker:
       #     version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
       - run:
