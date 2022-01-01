@@ -7,8 +7,8 @@ executors:
 commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
   build-image:
     parameters:
-      docker-image-name:
-        type: string
+      # docker-image-name:
+      #   type: string
       docker-arch:
         type: string
       node-arch:
