@@ -5,7 +5,7 @@ executors:
     #   - image: cimg/base:2021.12-20.04  # CircleCI Convenience Images: https://circleci.com/docs/2.0/next-gen-migration-guide/; https://hub.docker.com/r/cimg/base
     machine:
       image: ubuntu-2004:202111-01  # https://circleci.com/developer/machine/image/ubuntu-2004
-      docker_layer_caching: true  # DLC: 実行毎に 200 クレジット使用; https://circleci.com/docs/ja/2.0/docker-layer-caching/
+      # docker_layer_caching: true  # DLC: Free プランでは使用不可, 実行毎に 200 クレジット使用; https://circleci.com/docs/ja/2.0/docker-layer-caching/
       # DLC ボリュームは /var/lib/codker がキャッシュされ、3 日間使用されないと削除される
       # 同時に 1 つのジョブのみアタッチされる
       # 日次ビルドは無効, Pull-Request / Merge ビルドは有効で良さそう
