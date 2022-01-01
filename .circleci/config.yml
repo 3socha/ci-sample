@@ -1,6 +1,6 @@
 version: 2.1
 executors:
-  x64:
+  builder:
     # docker:
     #   - image: cimg/base:2021.12-20.04  # CircleCI Convenience Images: https://circleci.com/docs/2.0/next-gen-migration-guide/; https://hub.docker.com/r/cimg/base
     machine:
@@ -9,24 +9,26 @@ executors:
       # DLC ボリュームは /var/lib/codker がキャッシュされ、3 日間使用されないと削除される
       # 同時に 1 つのジョブのみアタッチされる
       # 日次ビルドは無効, Pull-Request / Merge ビルドは有効で良さそう
-      resource_class: large  # 4vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/configuration-reference/#resourceclass
-      environment:
-        DOCKER_BUILDKIT: '1'
-  arm64:
-    machine:
-      image: ubuntu-2004:202111-01
-      docker_layer_caching: true
-      resource_class: arm.medium  # 2vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/arm-resources/
-      environment:
-        DOCKER_BUILDKIT: '1'
-        # DOCKER_IMAGE_NAME: 3socha/ci-sample
+      # resource_class: large  # 4vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/configuration-reference/#resourceclass
+      # environment:
+      #   DOCKER_BUILDKIT: '1'
+  # arm64:
+  #   machine:
+  #     image: ubuntu-2004:202111-01
+  #     docker_layer_caching: true
+  #     resource_class: arm.medium  # 2vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/arm-resources/
+  #     environment:
+  #       DOCKER_BUILDKIT: '1'
+  #       # DOCKER_IMAGE_NAME: 3socha/ci-sample
 
 jobs:
   build-x64:
-    executor: x64
+    executor: builder
     environment:
+      DOCKER_BUILDKIT: '1'
       DOCKER_IMAGE_NAME: 3socha/ci-sample
       DOCKER_IMAGE_TAG: amd64
+    resource_class: large  # 4vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/configuration-reference/#resourceclass
     steps:
       - checkout
       - run:
@@ -65,8 +67,10 @@ jobs:
             docker push $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
 
   build-arm64:
-    executor: arm64
+    executor: builder
+    resource_class: arm.medium  # 2vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/arm-resources/
     environment:
+      DOCKER_BUILDKIT: '1'
       DOCKER_IMAGE_NAME: 3socha/ci-sample
       DOCKER_IMAGE_TAG: arm64
     steps:
@@ -140,6 +144,10 @@ jobs:
     steps:
       # - setup_remote_docker:
       #     version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
+      - run:
+          name: Login to Docker Hub
+          command: |
+            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
       - run:
           name: update manifest
           command:
