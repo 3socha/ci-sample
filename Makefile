@@ -1,7 +1,5 @@
 DOCKER_IMAGE_NAME := 3socha/ci-sample
 
-all: build
-
 build: prefetch
 	docker image build --tag $(DOCKER_IMAGE_NAME) .
 
