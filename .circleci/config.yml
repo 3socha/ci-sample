@@ -9,6 +9,9 @@ commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
     parameters:
       arch:
         type: string
+      docker-image-name:
+        type: string
+        default: 3socha/ci-sample
       node-arch:
         type: string
       node-version:
@@ -54,15 +57,14 @@ commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
       - run:
           name: Push a docker image
           command: |
-            docker tag ${DOCKER_IMAGE_NAME}:latest ${DOCKERI_IMAGE_NAME}:<< parameters.arch >>
-            docker push ${DOCKER_IMAGE_NAME}:<< parameters.arch >>
+            docker tag << parameters.docker-image-name >>:latest << parameters.docker-image-name >>:<< parameters.arch >>
+            docker push << parameters.docker-image-name >>:<< parameters.arch >>
 
 jobs:
   build-x64:
     executor: builder
     environment:
       DOCKER_BUILDKIT: '1'
-      DOCKER_IMAGE_NAME: 3socha/ci-sample
     resource_class: large  # 4vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/configuration-reference/#resourceclass
     steps:
       - build-image:
@@ -74,7 +76,6 @@ jobs:
     resource_class: arm.medium  # 2vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/arm-resources/
     environment:
       DOCKER_BUILDKIT: '1'
-      DOCKER_IMAGE_NAME: 3socha/ci-sample
     steps:
       - build-image:
           arch: arm64
@@ -86,10 +87,6 @@ jobs:
     environment:
       DOCKER_IMAGE_NAME: 3socha/ci-sample
     steps:
-      - run: |
-          if [ "$CIRCLE_BRANCH" != "main" ]; then
-            circleci-agent step halt
-          fi
       - run:
           name: Login to Docker Hub
           command: |
@@ -110,6 +107,9 @@ workflows:
       - build-x64
       - build-arm64
       - push-manifest:
+          filters:
+            branches:
+              only: main
           requires:
             - build-x64
             - build-arm64
