@@ -7,3 +7,8 @@
   run echo unko
   [ "${output}" = "unko" ]
 }
+
+@test "mecab with NEologd" {
+  run bash -c "echo シェル芸 | mecab -Owakati"
+  [ "$output" = "シェル芸 " ]
+}

@@ -40,7 +40,7 @@ commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
           name: Test a docker image
           command: |
             mkdir ~/reports
-            docker test-ci | pee cat "tap-xunit > ~/reports/result.xml"
+            make test-ci | pee cat "tap-xunit > ~/reports/result.xml"
       - store_test_results:
           path: ~/reports
       - run: |
