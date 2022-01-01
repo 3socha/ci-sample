@@ -8,7 +8,7 @@ all: build
 .PHONY: build
 build: egison-linux-$(ARCH).tar.gz
 
-egison-linux-$(ARCH).tar.gz: build.sh Dockerfile
+egison-linux-$(ARCH).tar.gz:
 	case "$(ARCH)" in \
 	  amd64) touch egison-linux-$(ARCH).tar.gz ;; \
 	  arm64) \
