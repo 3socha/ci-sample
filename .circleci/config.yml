@@ -21,6 +21,16 @@ commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
       - checkout
       - restore_cache:
           keys:
+            - egison-<< parameters.arch >>-{{ checksum "pre/egison/Makefile" }}-{{ checksum "pre/egison/build.sh" }}-{{ checksum "pre/egison/Dockerfile" }}
+      - run:
+          name: Pre-build egison
+          command: |
+            make -C pre/egison build
+      - save_cache:
+          key: egison-<< parameters.arch >>-{{ checksum "pre/egison/Makefile" }}-{{ checksum "pre/egison/build.sh" }}-{{ checksum "pre/egison/Dockerfile" }}
+          paths: pre/egison/egison-linux-<< parameters.arch>>.tar.gz
+      - restore_cache:
+          keys:
             - mecab-ipadic-{{ checksum "pre/mecab-ipadic/sha1sum.txt" }}
       - run:
           name: Build a docker image

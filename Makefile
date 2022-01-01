@@ -1,6 +1,14 @@
 DOCKER_IMAGE_NAME := 3socha/ci-sample
+subdirs := pre/egison
 
-build: prefetch
+.PHONY: all
+all: build
+
+.PHONY: $(subdirs)
+$(subdirs):
+	make -C $@ $(MAKECMDGOALS)
+
+build: prefetch $(subdirs)
 	docker image build --tag $(DOCKER_IMAGE_NAME) .
 
 build-ci: prefetch
@@ -29,5 +37,5 @@ test-ci:
 	  $(DOCKER_IMAGE_NAME) \
 	  /bin/bash -c "bats --tap /root/src/test.bats"
 
-clean:
+clean: $(subdirs)
 	rm -f pre/mecab-ipadic/*.tar.gz
