@@ -7,9 +7,7 @@ executors:
 commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
   build-image:
     parameters:
-      # docker-image-name:
-      #   type: string
-      docker-arch:
+      arch:
         type: string
       node-arch:
         type: string
@@ -18,10 +16,16 @@ commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
         type: string
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - mecab-ipadic-{{ checksum "pre/mecab-ipadic/sha1sum.txt" }}
       - run:
           name: Build a docker image
           command: |
-            docker image build --tag $DOCKER_IMAGE_NAME:<< parameters.docker-arch >> --progress plain .
+            make build-ci
+      - save_cache:
+          key: mecab-ipadic-{{ checksum "pre/mecab-ipadic/sha1sum.txt" }}
+          paths: pre/mecab-ipadic/
       - run:
           name: Install test tools
           command: |
@@ -30,18 +34,17 @@ commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
             mkdir ~/opt
             curl -sfSL --retry 3 https://nodejs.org/dist/<< parameters.node-version >>/node-<< parameters.node-version >>-linux-<< parameters.node-arch >>.tar.gz -o nodejs.tar.gz
             tar xf nodejs.tar.gz -C ~/opt --strip-components 1
-            PATH=$PATH:~/opt/bin npm install --global --silent --no-progress tap-xunit
-            echo "export PATH=$PATH:~/opt/bin" >> $BASH_ENV
+            PATH=${PATH}:~/opt/bin npm install --global --silent --no-progress tap-xunit
+            echo "export PATH=${PATH}:~/opt/bin" >> ${BASH_ENV}
       - run:
           name: Test a docker image
           command: |
             mkdir ~/reports
-            docker container run --rm --net none -v $(pwd):/root/src $DOCKER_IMAGE_NAME:<< parameters.docker-arch >> /bin/bash -c "bats --tap /root/src/test.bats" \
-              | pee cat "tap-xunit > ~/reports/result.xml"
+            make test-ci | pee cat "tap-xunit > ~/reports/result.xml"
       - store_test_results:
           path: ~/reports
       - run: |
-          if [ "$CIRCLE_BRANCH" != "main" ]; then
+          if [ "${CIRCLE_BRANCH}" != "main" ]; then
             circleci-agent step halt
           fi
       - run:
@@ -51,7 +54,8 @@ commands:  # https://circleci.com/docs/ja/2.0/reusing-config/
       - run:
           name: Push a docker image
           command: |
-            docker push $DOCKER_IMAGE_NAME:<< parameters.docker-arch >>
+            docker tag ${DOCKER_IMAGE_NAME}:latest ${DOCKERI_IMAGE_NAME}:<< parameters.arch >>
+            docker push ${DOCKER_IMAGE_NAME}:<< parameters.arch >>
 
 jobs:
   build-x64:
@@ -62,8 +66,7 @@ jobs:
     resource_class: large  # 4vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/configuration-reference/#resourceclass
     steps:
       - build-image:
-          # docker-image-name: 3socha/ci-sample
-          docker-arch: amd64
+          arch: amd64
           node-arch: x64
 
   build-arm64:
@@ -74,8 +77,7 @@ jobs:
       DOCKER_IMAGE_NAME: 3socha/ci-sample
     steps:
       - build-image:
-          # docker-image-name: 3socha/ci-sample
-          docker-arch: arm64
+          arch: arm64
           node-arch: arm64
 
   push-manifest:
@@ -88,8 +90,6 @@ jobs:
           if [ "$CIRCLE_BRANCH" != "main" ]; then
             circleci-agent step halt
           fi
-      # - setup_remote_docker:
-      #     version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
       - run:
           name: Login to Docker Hub
           command: |
@@ -98,30 +98,14 @@ jobs:
           name: update manifest
           command: |
             date_tag=$(date +%Y%m%d)
-            docker manifest create $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64 --amend
-            docker manifest push $DOCKER_IMAGE_NAME:latest
-            docker manifest create $DOCKER_IMAGE_NAME:$date_tag $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64 --amend
-            docker manifest push $DOCKER_IMAGE_NAME:$date_tag
+            docker manifest create ${DOCKER_IMAGE_NAME}:latest ${DOCKER_IMAGE_NAME}:amd64 ${DOCKER_IMAGE_NAME}:arm64 --amend
+            docker manifest push ${DOCKER_IMAGE_NAME}:latest
+            docker manifest create ${DOCKER_IMAGE_NAME}:${date_tag} ${DOCKER_IMAGE_NAME}:amd64 ${DOCKER_IMAGE_NAME}:arm64 --amend
+            docker manifest push ${DOCKER_IMAGE_NAME}:${date_tag}
 
 workflows:
   version: 2.1
   commit-workflow:
-    jobs:
-      - build-x64
-      - build-arm64
-      - push-manifest:
-          requires:
-            - build-x64
-            - build-arm64
-
-  scheduled-workflow:
-    triggers:
-      - schedule:
-          cron: "15 2 * * *"
-          filters:
-            branches:
-              only:
-                - main
     jobs:
       - build-x64
       - build-arm64
