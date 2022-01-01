@@ -154,7 +154,7 @@ jobs:
             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
       - run:
           name: update manifest
-          command:
+          command: |
             date_tag=$(date +%Y%m%d)
             docker manifest create $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64 --amend
             docker manifest push $DOCKER_IMAGE_NAME:latest
