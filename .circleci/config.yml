@@ -1,34 +1,38 @@
 version: 2.1
+executors:
+  x64:
+    # docker:
+    #   - image: cimg/base:2021.12-20.04  # CircleCI Convenience Images: https://circleci.com/docs/2.0/next-gen-migration-guide/; https://hub.docker.com/r/cimg/base
+    machine:
+      image: ubuntu-2004:202111-01  # https://circleci.com/developer/machine/image/ubuntu-2004
+      docker_layer_caching: true  # DLC: 実行毎に 200 クレジット使用; https://circleci.com/docs/ja/2.0/docker-layer-caching/
+      # DLC ボリュームは /var/lib/codker がキャッシュされ、3 日間使用されないと削除される
+      # 同時に 1 つのジョブのみアタッチされる
+      # 日次ビルドは無効, Pull-Request / Merge ビルドは有効で良さそう
+      resource_class: large  # 4vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/configuration-reference/#resourceclass
+      environment:
+        DOCKER_BUILDKIT: '1'
+  arm64:
+    machine:
+      image: ubuntu-2004:202111-01
+      docker_layer_caching: true
+      resource_class: arm.medium  # 2vCPU, 8GB RAM; https://circleci.com/docs/ja/2.0/arm-resources/
+      environment:
+        DOCKER_BUILDKIT: '1'
+        # DOCKER_IMAGE_NAME: 3socha/ci-sample
+
 jobs:
-  build:
-    docker:
-      - image: cimg/base:2021.12-20.04  # CircleCI Convenience Images: https://circleci.com/docs/2.0/next-gen-migration-guide/; https://hub.docker.com/r/cimg/base
-        environment:
-          DOCKER_BUILDKIT: "1"
-          DOCKER_IMAGE_NAME: 3socha/ci-sample
+  build-x64:
+    executor: x64
+    environment:
+      DOCKER_IMAGE_NAME: 3socha/ci-sample
+      DOCKER_IMAGE_TAG: amd64
     steps:
       - checkout
-      - setup_remote_docker:
-          version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version; Buildx は Docker 20.10 で正式サポート
       - run:
-          name: Install Docker Buildx  # https://docs.docker.com/buildx/working-with-buildx/
+          name: Build a docker image
           command: |
-            mkdir -p ~/.docker/cli-plugins/
-            curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
-            chmod a+x ~/.docker/cli-plugins/docker-buildx
-            docker buildx version
-            docker run --privileged --rm tonistiigi/binfmt --install arm64
-            docker context create buildcontext
-            docker buildx create buildcontext --use
-      - run:
-          name: Build Docker images
-          command: |
-            docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME --progress plain .
-      - run:
-          name: Load Docker images (use cache)
-          command: |
-            docker buildx build --platform linux/amd64 --tag $DOCKER_IMAGE_NAME:amd64 --progress plain --load .
-            docker buildx build --platform linux/arm64 --tag $DOCKER_IMAGE_NAME:arm64 --progress plain --load .
+            docker image build --tag $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG --progress plain .
       - run:
           name: Install test tools
           command: |
@@ -40,15 +44,77 @@ jobs:
             PATH=$PATH:~/opt/bin npm install --global --silent --no-progress tap-xunit
             echo "export PATH=$PATH:~/opt/bin" >> $BASH_ENV
       - run:
-          name: Test Docker images
+          name: Test a docker image
           command: |
             mkdir ~/reports
-            docker create -v /root/src --name source ubuntu:20.04 /bin/true
-            docker cp test.bats source:/root/src
-            docker container run --rm --net=none --volumes-from source $DOCKER_IMAGE_NAME:amd64 \
-              /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/amd64.xml"
-            docker container run --rm --net=none --volumes-from source $DOCKER_IMAGE_NAME:arm64 \
-              /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/arm64.xml"
+            docker container run --rm --net none -v $(pwd):/root/src $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG /bin/bash -c "bats --tap /root/src/test.bats" \
+              | pee cat "tap-xunit > ~/reports/result.xml"
+      - store_test_results:
+          path: ~/reports
+      - run: |
+          if [ "$CIRCLE_BRANCH" != "main" ]; then
+            circleci-agent step halt
+          fi
+      - run:
+          name: Login to Docker Hub
+          command: |
+            echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
+      - run:
+          name: Push a docker image
+          command: |
+            docker push $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
+
+  build-arm64:
+    executor: arm64
+    environment:
+      DOCKER_IMAGE_NAME: 3socha/ci-sample
+      DOCKER_IMAGE_TAG: arm64
+    steps:
+      - checkout
+      # - setup_remote_docker:
+      #     version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version; Buildx は Docker 20.10 で正式サポート
+      # - run:
+      #     name: Install Docker Buildx  # https://docs.docker.com/buildx/working-with-buildx/
+      #     command: |
+      #       mkdir -p ~/.docker/cli-plugins/
+      #       curl -sfSL --retry 3 https://github.com/docker/buildx/releases/download/v0.7.1/buildx-v0.7.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
+      #       chmod a+x ~/.docker/cli-plugins/docker-buildx
+      #       docker buildx version
+      #       docker run --privileged --rm tonistiigi/binfmt --install arm64
+      #       docker context create buildcontext
+      #       docker buildx create buildcontext --use
+      - run:
+          name: Build a docker image
+          command: |
+            docker image build --tag $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG --progress plain .
+          # docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME --progress plain .
+      # - run:
+      #     name: Load Docker images (use cache)
+      #     command: |
+      #       docker buildx build --platform linux/amd64 --tag $DOCKER_IMAGE_NAME:amd64 --progress plain --load .
+      #       docker buildx build --platform linux/arm64 --tag $DOCKER_IMAGE_NAME:arm64 --progress plain --load .
+      - run:
+          name: Install test tools
+          command: |
+            sudo apt update -qq
+            sudo apt install -y -qq moreutils
+            mkdir ~/opt
+            curl -sfSL --retry 3 https://nodejs.org/dist/v16.13.1/node-v16.13.1-linux-arm64.tar.gz -o nodejs.tar.gz
+            tar xf nodejs.tar.gz -C ~/opt --strip-components 1
+            PATH=$PATH:~/opt/bin npm install --global --silent --no-progress tap-xunit
+            echo "export PATH=$PATH:~/opt/bin" >> $BASH_ENV
+      - run:
+          name: Test a docker image
+          command: |
+            mkdir ~/reports
+            docker container run --rm --net none -v $(pwd):/root/src $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG /bin/bash -c "bats --tap /root/src/test.bats" \
+              | pee cat "tap-xunit > ~/reports/result.xml"
+          # docker create -v /root/src --name source ubuntu:20.04 /bin/true
+          # docker cp test.bats source:/root/src
+          # docker container run --rm --net=none --volumes-from source $DOCKER_IMAGE_NAME:amd64 \
+          #   /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/amd64.xml"
+          # docker container run --rm --net=none --volumes-from source $DOCKER_IMAGE_NAME:arm64 \
+          #   /bin/bash -c "bats --tap /root/src/test.bats" | pee cat "tap-xunit > ~/reports/arm64.xml"
       - store_test_results:  # 以前のテストステップが失敗しても実行される
           path: ~/reports
       - run: |  # main ブランチがターゲットでない場合はジョブを停止する
@@ -60,16 +126,38 @@ jobs:
           command: |
             echo ${DOCKER_PASS} | docker login -u ${DOCKER_USER} --password-stdin
       - run:
-          name: Push Docker images (use cache)
+          name: Push a docker image
           command: |
-            docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME:$(date +%Y%m%d) --progress plain --push .
-            docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME:latest          --progress plain --push .
+            docker push $DOCKER_IMAGE_NAME:$DOCKER_IMAGE_TAG
+          # docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME:$(date +%Y%m%d) --progress plain --push .
+          # docker buildx build --platform linux/amd64,linux/arm64 --tag $DOCKER_IMAGE_NAME:latest          --progress plain --push .
+
+  push-manifest:
+    docker:
+      - image: cimg/base:2021.12-20.04  # CircleCI Convenience Images: https://circleci.com/docs/2.0/next-gen-migration-guide/; https://hub.docker.com/r/cimg/base
+    environment:
+      DOCKER_IMAGE_NAME: 3socha/ci-sample
+    steps:
+      # - setup_remote_docker:
+      #     version: "20.10.11"  # https://circleci.com/docs/2.0/building-docker-images/#docker-version
+      - run:
+          name: update manifest
+          command:
+            docker manifest create $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64
+            docker manifest create $DOCKER_IMAGE_NAME:$(date +%Y%m%d) $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64
+            docker manifest push $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:$(date +%Y%m%d)
 
 workflows:
   version: 2.1
   commit-workflow:
     jobs:
-      - build
+      - build-x64
+      - build-arm64
+      - push-manifest:
+          requires:
+            - build-x64
+            - build-arm64
+
   scheduled-workflow:
     triggers:
       - schedule:
@@ -79,4 +167,9 @@ workflows:
               only:
                 - main
     jobs:
-      - build
+      - build-x64
+      - build-arm64
+      - push-manifest:
+          requires:
+            - build-x64
+            - build-arm64
