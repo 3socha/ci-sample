@@ -12,3 +12,8 @@
   run bash -c "echo シェル芸 | mecab -Owakati"
   [ "$output" = "シェル芸 " ]
 }
+
+@test "egison" {
+  run egison -e 'foldl (+) 0 (take 10 nats)'
+  [ "$output" = "55" ]
+}
