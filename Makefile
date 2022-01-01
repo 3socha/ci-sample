@@ -16,7 +16,7 @@ build-ci: prefetch
 
 .PHONY: prefetch
 prefetch:
-	cd pre/mecab-ipadic/ && sha1sum -c sha1sum.txt || curl -SfL "https://ja.osdn.net/frs/g_redir.php?m=kent&f=mecab/mecab-ipadic/2.7.0-20070801/mecab-ipadic-2.7.0-20070801.tar.gz" -o mecab-ipadic-2.7.0-20070801.tar.gz
+	cd pre/mecab-ipadic/; sha1sum -c sha1sum.txt || curl -SfL "https://ja.osdn.net/frs/g_redir.php?m=kent&f=mecab/mecab-ipadic/2.7.0-20070801/mecab-ipadic-2.7.0-20070801.tar.gz" -o mecab-ipadic-2.7.0-20070801.tar.gz
 
 test:
 	docker container run \
