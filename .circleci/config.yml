@@ -155,9 +155,11 @@ jobs:
       - run:
           name: update manifest
           command:
-            docker manifest create $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64
-            docker manifest create $DOCKER_IMAGE_NAME:$(date +%Y%m%d) $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64
-            docker manifest push $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:$(date +%Y%m%d)
+            date_tag=$(date +%Y%m%d)
+            docker manifest create $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64 --amend
+            docker manifest push $DOCKER_IMAGE_NAME:latest
+            docker manifest create $DOCKER_IMAGE_NAME:$date_tag $DOCKER_IMAGE_NAME:amd64 $DOCKER_IMAGE_NAME:arm64 --amend
+            docker manifest push $DOCKER_IMAGE_NAME:$date_tag
 
 workflows:
   version: 2.1
