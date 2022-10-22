@@ -1,30 +1,66 @@
-FROM ubuntu:21.10 as builder
-ARG TARGETARCH
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt update -qq \
-  && apt install -y -qq curl git libmecab-dev mecab build-essential ca-certificates
-RUN git clone --depth 1 https://github.com/neologd/mecab-ipadic-neologd
-COPY pre/mecab-ipadic/mecab-ipadic-2.7.0-20070801.tar.gz /mecab-ipadic-neologd/build/
-RUN mkdir /mecab-ipadic-neologd-utf8
-RUN apt install -y -qq file
-RUN /mecab-ipadic-neologd/bin/install-mecab-ipadic-neologd -u -y -p /mecab-ipadic-neologd-utf8
-COPY pre/egison/egison-linux-${TARGETARCH}.tar.gz /egison/
-RUN if [ "$(uname -m)" = "x86_64" ]; then curl -sfSL https://github.com/egison/egison-package-builder/releases/download/4.1.3/egison-4.1.3.x86_64.deb -o /egison/egison.deb; fi
+# syntax = docker/dockerfile:latest
+FROM ubuntu:22.04 AS apt-cache
+RUN apt-get update
 
-FROM ubuntu:21.10 as runtime
-ARG TARGETARCH
+FROM ubuntu:22.04 AS base
 ENV DEBIAN_FRONTEND noninteractive
-RUN apt update -qq \
-  && apt install -y -qq curl bats git mecab mecab-ipadic mecab-ipadic-utf8 language-pack-ja locales \
-  && rm -rf /var/lib/apt/lists/*
-RUN locale-gen ja_JP.UTF-8
-ENV LANG=ja_JP.UTF-8
-COPY pre/${TARGETARCH}/arch.txt .
-RUN --mount=type=bind,target=/mecab-ipadic-neologd-utf8,from=builder,source=/mecab-ipadic-neologd-utf8 \
-  cp -r /mecab-ipadic-neologd-utf8/* /var/lib/mecab/dic/ipadic-utf8/
-RUN --mount=type=bind,target=/egison,from=builder,source=/egison \
-  case $(uname -m) in \
-    x86_64) dpkg --install /egison/egison.deb ;; \
-    aarch64) mkdir -p /usr/lib/egison; tar xf /egison/egison-*.tar.gz -C /usr/lib/egison --strip-components 1 ;; \
-  esac
-ENV PATH $PATH:/usr/lib/egison/bin
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+RUN echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/no-install-recommends
+RUN --mount=type=bind,target=/var/lib/apt/lists,from=apt-cache,source=/var/lib/apt/lists \
+    --mount=type=cache,target=/var/cache/apt \
+    apt-get install -y -qq build-essential ca-certificates curl git unzip
+
+## Node.js
+FROM base AS nodejs-builder
+ARG TARGETARCH
+COPY prefetched/$TARGETARCH/nodejs.tar.gz .
+RUN tar xf nodejs.tar.gz \
+    && mv node-* /usr/local/nodejs
+ENV PATH $PATH:/usr/local/nodejs/bin
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g --silent faker-cli chemi fx yukichant @amanoese/muscular kana2ipa receiptio bats
+# enable png output on receiptio; do not install chromium here
+RUN --mount=type=cache,target=/root/.npm \
+    if [ "${TARGETARCH}" = "amd64" ]; then npm install -g puppeteer --ignore-scripts; fi \
+    && sed "s/puppeteer.launch({/& args: ['--no-sandbox'],/" -i /usr/local/nodejs/lib/node_modules/receiptio/lib/receiptio.js
+
+## General
+FROM base AS general-builder
+ARG TARGETARCH
+WORKDIR /downloads
+
+# Chromium
+COPY prefetched/$TARGETARCH/chrome-linux.zip .
+WORKDIR /
+
+## Runtime
+FROM base AS runtime
+ARG TARGETARCH
+
+# Set environments
+ENV LANG ja_JP.UTF-8
+ENV TZ JST-9
+ENV PATH /usr/games:$PATH
+# for idn command
+ENV CHARSET UTF-8
+
+# apt
+RUN --mount=type=bind,target=/var/lib/apt/lists,from=apt-cache,source=/var/lib/apt/lists \
+    --mount=type=cache,target=/var/cache/apt \
+    apt-get install -y -qq \
+      language-pack-ja-base language-pack-ja
+
+# Node.js
+COPY --from=nodejs-builder /usr/local/nodejs /usr/local/nodejs
+ENV PATH $PATH:/usr/local/nodejs/bin
+
+# chromium
+RUN --mount=type=bind,target=/downloads,from=general-builder,source=/downloads \
+    if [ "${TARGETARCH}" = "amd64" ]; then unzip /downloads/chrome-linux.zip -d /usr/local; fi
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/local/chrome-linux/chrome
+ENV PATH $PATH:/usr/local/chrome-linux
+
+# reset apt config
+RUN rm /etc/apt/apt.conf.d/keep-cache /etc/apt/apt.conf.d/no-install-recommends
+COPY --from=ubuntu:22.04 /etc/apt/apt.conf.d/docker-clean /etc/apt/apt.conf.d/

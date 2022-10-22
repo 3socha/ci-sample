@@ -1,41 +1,34 @@
 DOCKER_IMAGE_NAME := 3socha/ci-sample
-subdirs := pre/egison
 
-.PHONY: all
 all: build
 
-.PHONY: $(subdirs)
-$(subdirs):
-	make -C $@ $(MAKECMDGOALS)
-
-build: prefetch $(subdirs)
-	docker image build --tag $(DOCKER_IMAGE_NAME) .
+build: prefetch
+	DOCKER_BUILDKIT=1 docker image build --tag $(DOCKER_IMAGE_NAME) .
 
 build-ci: prefetch
-	docker image build --tag $(DOCKER_IMAGE_NAME) --progress plain .
+	DOCKER_BUILDKIT=1 docker image build --tag $(DOCKER_IMAGE_NAME) --progress plain .
 
-.PHONY: prefetch
 prefetch:
-	cd pre/mecab-ipadic/; sha1sum -c sha1sum.txt || curl -SfL "https://ja.osdn.net/frs/g_redir.php?m=kent&f=mecab/mecab-ipadic/2.7.0-20070801/mecab-ipadic-2.7.0-20070801.tar.gz" -o mecab-ipadic-2.7.0-20070801.tar.gz
+	./prefetch_files.sh
 
 test:
 	docker container run \
-	  --rm \
-	  --net none \
-	  --oom-kill-disable \
-	  --pids-limit 1024 \
-	  --memory 100m \
-	  -v $(CURDIR):/root/src \
-	  $(DOCKER_IMAGE_NAME) \
-	  /bin/bash -c "bats /root/src/test.bats"
+		--rm \
+		--net none \
+		--oom-kill-disable \
+		--pids-limit 1024 \
+		--memory 100m \
+		-v $(CURDIR):/root/src \
+		$(DOCKER_IMAGE_NAME) \
+		/bin/bash -c "bats --print-output-on-failure /root/src/docker_image.bats"
 
 test-ci:
 	@docker container run \
-	  --rm \
-	  --net none \
-	  -v $(CURDIR):/root/src \
-	  $(DOCKER_IMAGE_NAME) \
-	  /bin/bash -c "bats --tap /root/src/test.bats"
+		--rm \
+		--net none \
+		-v $(CURDIR):/root/src \
+		$(DOCKER_IMAGE_NAME) \
+		/bin/bash -c "bats --print-output-on-failure --tap /root/src/docker_image.bats"
 
 clean: $(subdirs)
-	rm -f pre/mecab-ipadic/*.tar.gz
+	rm -f prefetched/*/*.gz prefetched/*/*.zip
