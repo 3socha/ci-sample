@@ -49,7 +49,8 @@ ENV CHARSET UTF-8
 RUN --mount=type=bind,target=/var/lib/apt/lists,from=apt-cache,source=/var/lib/apt/lists \
     --mount=type=cache,target=/var/cache/apt \
     apt-get install -y -qq \
-      language-pack-ja-base language-pack-ja
+      language-pack-ja-base language-pack-ja \
+      libatk-bridge2.0-dev libnss3-dev libcups2-dev libdrm-dev libxcomposite-dev libxdamage-dev libxrandr-dev libgbm-dev libxkbcommon-dev libpango1.0-dev libasound2-dev
 
 # Node.js
 COPY --from=nodejs-builder /usr/local/nodejs /usr/local/nodejs
